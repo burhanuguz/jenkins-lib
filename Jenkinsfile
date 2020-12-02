@@ -48,6 +48,7 @@ pipeline {
 						if ( params.whichProjects == "QA" || params.whichProjects == "TEST" || params.whichProjects == "DEV" || params.whichProjects == "All Projects" ) {
 							if ( params.whichProjects == "QA" || params.whichProjects == "TEST" || params.whichProjects == "DEV" ) {
 								String filter = "(.*)${params.whichProjects.toLowerCase()}(.*)"
+							}
 							else {
 								String filter = "^(?!openshift)(.*)"
 							}
