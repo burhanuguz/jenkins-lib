@@ -31,8 +31,9 @@ pipeline {
 	
 	//Parameters
 	parameters {
-		choice ( name: whichProjects , choices: ['All Projects','QA','TEST','DEV','SERVICE','OrderBased'], description: 'Hangi Projeler için Rollout yapılacak? (SERVICE ve OrderBased için VARIABLES kısmını doldurun)'  )
-		text   ( name: 'VARIABLES'   , defaultValue: '' , description: 'Order Bazlı Rollout' )
+		choice       ( name: 'whichProjects' , description: 'Tanimli projeler için Rollout', choices: ['All Projects', 'QA', 'TEST', 'DEV'] )
+		booleanParam ( name: 'SERVICE'       , description: 'Servis Bazlı Rollout icin isaretleyin ve alanı doldurun.', defaultValue: false )
+		text         ( name: 'VARIABLES'     , description: 'Servis veya Order Bazlı Rollout icin doldurun' , defaultValue: 'SERVICE için\nproject1\nproject2\nOrder bazli icin \nproject1.deploymentconfig1\nproject2.deploymentconfig2' )
 	}
 	
 	stages{        
@@ -45,7 +46,7 @@ pipeline {
 						namespaces = readJSON text: apiRequest("\"https://myapiserver:6443/apis/project.openshift.io/v1/projects\"", "GET")
 						
 						// DEV, QA, TEST veya All Projects seçildi ise
-						if ( params.whichProjects == "QA" || params.whichProjects == "TEST" || params.whichProjects == "DEV" || params.whichProjects == "All Projects" ) {
+						if ( params.SERVICE == false && params.whichProjects == "QA" || params.whichProjects == "TEST" || params.whichProjects == "DEV" || params.whichProjects == "All Projects" ) {
 							if ( params.whichProjects == "QA" || params.whichProjects == "TEST" || params.whichProjects == "DEV" ) {
 								String filter = "(.*)${params.whichProjects.toLowerCase()}(.*)"
 							}
@@ -61,7 +62,7 @@ pipeline {
 										//DeploymentConfig listesi çekilir
 										def dcSelector = openshift.selector( 'deploymentconfig' )
 										//her dc için rollout çekilir
-										dcSelector.withEach { 
+										dcSelector.withEach {
 											//yukarıda tanımlanan fonksiyon çekilir
 											dcroller("${it.name().replaceAll('deploymentconfig/','')}")
 										}
@@ -70,35 +71,33 @@ pipeline {
 							}
 						}
 						
-						else if ( params.whichProjects == "SERVICE" ) {
+						else if ( params.SERVICE == true ) {
 							//Text kontrolleri yapılır
-							if (params.VARIABLES.isEmpty() == false) {
-								//test alanı parse edilerek array içine alınır
-								def ns = params.VARIABLES.split('\n').collect{"${it}"}
-								//Array içindeki her obje için
-								ns.each {
-									ns = "${it}"
-									//Proje var mı kontrolü yapılır
-									if (namespaces.items.metadata.name.find { it == ns }) {
-										//Her proje içine gidilir
-										openshift.withProject("${it}") {
-											//DeploymentConfig listesi çekilir
-											def dcSelector = openshift.selector( 'deploymentconfig' )
-											//DC varlık kontrolü yapılır
-											if (dcSelector.exists()) {
-												//her dc için rollout çekilir
-												dcSelector.withEach {
-													//yukarıda tanımlanan fonksiyon çekilir
-													dcroller("${it.name().replaceAll('deploymentconfig/','')}")
-												}
+							if (params.VARIABLES.isEmpty()) { error('Namespace adı girilmeli!!') }
+							//test alanı parse edilerek array içine alınır
+							def ns = params.VARIABLES.split('\n').collect{"${it}"}
+							//Array içindeki her obje için
+							ns.each {
+								ns = "${it}"
+								//Proje var mı kontrolü yapılır
+								if (namespaces.items.metadata.name.find { it == ns }) {
+									//Her proje içine gidilir
+									openshift.withProject("${it}") {
+										//DeploymentConfig listesi çekilir
+										def dcSelector = openshift.selector( 'deploymentconfig' )
+										//DC varlık kontrolü yapılır
+										if (dcSelector.exists()) {
+											//her dc için rollout çekilir
+											dcSelector.withEach {
+												//yukarıda tanımlanan fonksiyon çekilir
+												dcroller("${it.name().replaceAll('deploymentconfig/','')}")
 											}
-											else { echo "######### ${ns} Projesinde DC Bulunamadi ###################" }
 										}
+										else { echo "######### ${ns} Projesinde DC Bulunamadi ###################" }
 									}
-									else { echo "######### Proje Bulunamadi - ${ns} ###################" }
 								}
+								else { echo "######### Proje Bulunamadi - ${ns} ###################" }
 							}
-							else { error('Namespace adı girilmeli!!') }
 						}
 						
 						else {
