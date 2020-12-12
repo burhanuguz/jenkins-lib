@@ -31,7 +31,7 @@ pipeline {
 	
 	//Parameters
 	parameters {
-		choice       ( name: 'whichProjects' , description: 'Tanimli projeler için Rollout', choices: ['All Projects', 'QA', 'TEST', 'DEV'] )
+		choice       ( name: 'whichProjects' , description: 'Tanimli projeler için Rollout', choices: ['NONE','All Projects', 'QA', 'TEST', 'DEV','ORDER'] )
 		booleanParam ( name: 'SERVICE'       , description: 'Servis Bazlı Rollout icin isaretleyin ve alanı doldurun.', defaultValue: false )
 		text         ( name: 'VARIABLES'     , description: 'Servis veya Order Bazlı Rollout icin doldurun' , defaultValue: 'SERVICE için\nproject1\nproject2\nOrder bazli icin \nproject1.deploymentconfig1\nproject2.deploymentconfig2' )
 	}
@@ -40,7 +40,7 @@ pipeline {
 		stage('action') {
 			steps {
 				script {
-					openshift.withCluster( 'sandbox') {
+					openshift.withCluster('sandbox') {
 					
 						// OCP rest api ile proje isimleri alınır
 						namespaces = readJSON text: apiRequest("\"https://myapiserver:6443/apis/project.openshift.io/v1/projects\"", "GET")
@@ -48,10 +48,10 @@ pipeline {
 						// DEV, QA, TEST veya All Projects seçildi ise
 						if ( params.SERVICE == false && params.whichProjects == "QA" || params.whichProjects == "TEST" || params.whichProjects == "DEV" || params.whichProjects == "All Projects" ) {
 							if ( params.whichProjects == "QA" || params.whichProjects == "TEST" || params.whichProjects == "DEV" ) {
-								String filter = "(.*)${params.whichProjects.toLowerCase()}(.*)"
+								def filter = "(.*)${params.whichProjects.toLowerCase()}(.*)"
 							}
 							else {
-								String filter = "^(?!openshift)(.*)"
+								def filter = "^(?!openshift)(.*)"
 							}
 							//For each ile her proje içine girilir
 							namespaces.items.metadata.name.each {
